@@ -1,3 +1,10 @@
-# 科研分析程序
+# Research Analysis
 
-本代码库主要保存科研过程中使用到的一些脚本
+Collection of scripts for molecular simulation analysis.
+
+## Analysis tools
+
+- `FEL-analysis/`: 
+- `pi-pi-stacking-plot/`: 
+- `secondary-structure-analysis/`: 
+- `HPS-pdb-2-pdbx-converter/`:

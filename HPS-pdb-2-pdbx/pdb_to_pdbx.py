@@ -360,7 +360,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mapping-output", type=Path, default=None,
-        help="TSV mapping output (default: output-name.chains.tsv)",
+        help="CSV mapping output (default: output-name.chains.csv)",
     )
     parser.add_argument(
         "--block-name", default=None,
@@ -388,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
         models, crystallography = parse_pdb(args.input_pdb)
         validate_models(models, args.chain_count, args.chain_length)
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        mapping_path = args.mapping_output or args.output.with_suffix(".chains.tsv")
+        mapping_path = args.mapping_output or args.output.with_suffix(".chains.csv")
         requested_block_name = args.block_name or args.output.stem
         # CIF data-block headers cannot contain whitespace or quoting.  Keep the
         # requested name recognizable while making any file name safe to use.

@@ -1,5 +1,5 @@
 1. fast contact map calculation
-2. spontaneous llps cluster analysis (single protein only)
+2. spontaneous llps cluster analysis (multiple proteins supported)
 3. spontaneous llps density analysis (single protein only)
 
 

@@ -1,4 +1,4 @@
-# cluster analysis in DROPPS package by Yun Zhou @ Fudan
+# cluster analysis in DROPPS package by Yun Zhou / Zichao Wang @ Fudan
 # Development started on Sep 10 2026
 
 from argparse import ArgumentParser
@@ -20,7 +20,12 @@ import os
 
 
 class cluster_analysis:
-    """统计 chain contact map 中的连通 cluster。"""
+    """
+    统计 chain contact map 中的连通 cluster。
+
+    连通性只依赖链间接触数，与链长无关；混合链长体系也使用同一个
+    cutoff 阈值，cluster size 仍表示链的条数，而不是残基总数。
+    """
 
     def __init__(self, chain_connectivity, num_chain, cutoff=2) -> None:
         self.chain_connectivity = chain_connectivity
@@ -81,6 +86,8 @@ def _build_lookup_fixed(chains, max_idx):
 
     链编号是 chains 中的下标；未选中的粒子记为 -1。
     拓扑在分析过程中不变，因此该查找表只在帧循环外建立一次。
+    每条链都独立生成 0..len(chain)-1 的位置编号，天然支持不同链长，
+    不需要统一长度或填充。保留函数名中的 fixed 以兼容已有调用。
     """
     idx_to_chain = np.full(max_idx + 1, -1, dtype=np.int32)
     idx_to_pos = np.full(max_idx + 1, -1, dtype=np.int32)
@@ -124,21 +131,21 @@ def accumulate_chain_contact_map_fixed(
     pairs, chains, chain_lookup, unique_pairs=True,
 ):
     """
-    将 contact.py 的二维残基图聚合改成逐链对计数。
+    将 contact.py 的二维残基图聚合改成逐链对计数，支持混合链长。
 
     输入 pairs 是当前帧通过距离筛选后的全局 atom/bead 编号对。
     返回对称的 (num_chain, num_chain) int64 矩阵：元素 [i, j]
     是链 i 与链 j 的接触数，对角线和没有接触的链对均为 0。
 
-    假设每条链选中相同数量的粒子，每个残基对应一个选中的 bead；
+    chains 中各条链可以选中不同数量的粒子；函数名中的 fixed 仅为
+    兼容已有调用保留，不再要求等长链。每个残基对应一个选中的 bead；
     若直接输入全原子选择，这里得到的是 atom-atom 接触数。
-    只复用一个 (chain_length, chain_length) bool 临时图，避免保存
-    (num_chain, num_chain, chain_length, chain_length) 四维数组。
+    链 i、j 的临时图形状为 (len(chains[i]), len(chains[j]))。
+    各链对复用同一个 bool 缓冲区，其容量按实际接触链对的需要增长，
+    不把短链填充至最长链长度，也不同时保存所有链对的残基图。
     """
     num_chain = len(chains)
-    chain_length = len(chains[0]) if num_chain else 0
-    if any(len(chain) != chain_length for chain in chains):
-        raise ValueError("chains must have the same number of selected atoms")
+    chain_lengths = [len(chain) for chain in chains]
 
     chain_contact_map_temp = np.zeros((num_chain, num_chain), dtype=np.int64)
     pairs = _canonicalize_pairs(
@@ -176,26 +183,38 @@ def accumulate_chain_contact_map_fixed(
         [0], np.flatnonzero(np.diff(sorted_pair_ids)) + 1, [len(order)],
     ))
 
-    residue_contact_map = np.zeros((chain_length, chain_length), dtype=bool)
+    # 使用一维缓冲区，按当前链对的 Li x Lj 重新解释形状。
+    # 只在容量不足时扩容，避免为每一种长度组合缓存一张二维矩阵。
+    residue_contact_buffer = np.empty(0, dtype=bool)
     for start, stop in zip(boundaries[:-1], boundaries[1:]):
+        i, j = divmod(int(sorted_pair_ids[start]), num_chain)
+        length_i, length_j = chain_lengths[i], chain_lengths[j]
+        map_size = length_i * length_j
+        if residue_contact_buffer.size < map_size:
+            residue_contact_buffer = np.zeros(map_size, dtype=bool)
+        residue_contact_map = residue_contact_buffer[:map_size].reshape(
+            length_i, length_j,
+        )
+
         members = order[start:stop]
         rows, cols = row_pos[members], col_pos[members]
         residue_contact_map[rows, cols] = True
         contact_number = residue_contact_map.sum(dtype=np.int64)
 
-        i, j = divmod(int(sorted_pair_ids[start]), num_chain)
         chain_contact_map_temp[i, j] = contact_number
         chain_contact_map_temp[j, i] = contact_number
 
         # 临时图的行、列分别属于两条不同的链，只填一次，不需要除以 2。
-        # 清除本链对用过的位置，随后复用该图处理下一对链。
+        # 清除本链对用过的位置，使下一链对即使改变图的形状也从全零开始。
         residue_contact_map[rows, cols] = False
+        # 释放当前二维视图，确保后续扩容时旧缓冲区不会被该视图保留。
+        del residue_contact_map
 
     return chain_contact_map_temp
 
 
 prog = "cluster"
-desc = '''This performant program analysis the cluster distribution of the spontaneous LLPS process.'''
+desc = '''This performant program loads all chains in your simulation and analysis the cluster distribution of the spontaneous LLPS process.'''
 
 def getargs_cluster(argv):
     parser = ArgumentParser(prog=prog, description=desc)
@@ -209,20 +228,14 @@ def getargs_cluster(argv):
     parser.add_argument('-n', '--index', type=str, required=False,
                         help="Index file containing non-default groups.")
 
-    parser.add_argument('-ref', '--reference-group', type=int,
-                        help="Group of atoms in equal-length chains to analyze for clusters.")
-    
-    parser.add_argument('-sel', '--selection-group', type=int,
-                        help="Must select the same atoms as the reference group for cluster analysis.")
-    
     parser.add_argument('-cs', '--cutoff-scheme', type=str, choices=["global", "residue"], required=True, default="global", 
                         help="Scheme for determining inter-residue contacts.")
     
     parser.add_argument('-c', '--cutoff', type=float, default=0.8,
                         help="Cutoff distance for contact calculation, unit is nanometer.")
 
-    parser.add_argument('-cc', '--cutoff-cluster', type=int, default=3,
-                        help="Cutoff number for cluster calculation, default is 3.")
+    parser.add_argument('-cc', '--cutoff-cluster', type=int, default=5,
+                        help="Cutoff number for cluster calculation, default is 5.")
 
     parser.add_argument('-cm', '--cutoff-multiplier', type=float, default=1.2,
                         help="Factor which is multiplied to sigma value for residue-wise contact cutoff.")
@@ -238,25 +251,6 @@ def getargs_cluster(argv):
 
     parser.add_argument('-dt', '--delta-time', type=float,
                         help="Intervals (ns) between two calculated frames.")
-    
-    parser.add_argument('-pbc', '--treat-pbc', action='store_true', default=True,
-                        help="Treat broken molecule at periodic boundaries, default is True.")
-
-    # parser.add_argument("--search-mode", choices=["fast", "stream"], default="fast",
-    #                     help=("Neighbor-search strategy: fast stores all pairs from one frame; "
-    #                           "stream bounds pair memory by searching in query batches."),)
-
-    # parser.add_argument('-ors', '--output-inter-reference-selection', type=str,
-    #                     help="DAT file to write inter-chain contact map between reference and selection groups.")
-    
-    # parser.add_argument('-orr', '--output-inter-reference-reference', type=str,
-    #                     help="DAT file to write inter-chain contact map between reference groups.")
-    
-    # parser.add_argument('-oss', '--output-inter-selection-selection', type=str,
-    #                     help="DAT file to write inter-chain contact map between selection groups.")
-    
-    # parser.add_argument('-or', '--output-intra-reference', type=str,
-    #                     help="DAT file to write intra-chain contact map between reference groups.")
     
     parser.add_argument('-ocd', '--output-cluster-distribution', type=str, default='cluster_distribution.npz',
                         help="numpy NPZ file to write the cluster size distribution as a function of time.")
@@ -283,11 +277,8 @@ def cluster_distribution_fast(args):
         print("## An exception occurred when trying to open trajectory file %s." % args.input)
         quit()
 
-    if args.treat_pbc is True:
-        print(f"## Distance will be calculated using periodic boundary conditions.")
-        # FastNS 内部处理周期盒和最小镜像距离，无需先按键连接 unwrap。
-    else:
-        print(f"## WARNING: Distance will be calculated without periodic boundary conditions.")
+    # 本程序固定使用周期边界条件；FastNS 内部处理最小镜像距离。
+    print("## Distance will be calculated using periodic boundary conditions.")
 
     # We determine cutoff scheme and generate cutoff distance vector
     if args.cutoff_scheme == "global":
@@ -367,41 +358,31 @@ def cluster_distribution_fast(args):
     start_frame, end_frame, interval_frame = trajectory.time2frame(args.start_time, args.end_time, args.delta_time)
     frame_list = range(start_frame, end_frame, interval_frame)
 
-    # We now generate atom groups for calculations
-    if args.reference_group is None or args.selection_group is None:
-        trajectory.index.print_all()
-
-    if args.reference_group is not None:
-        print(f"## Will use group {args.reference_group} as reference group.")
-        reference_group, reference_group_name = trajectory.getSelection(f"group {args.reference_group}")
-    else:
-        reference_group, reference_group_name = trajectory.getSelection_interactive("reference group")
-
-    if args.selection_group is not None:
-        print(f"## Will use group {args.selection_group} as selection group.")
-        selection_group, selection_group_name = trajectory.getSelection(f"group {args.selection_group}")
-    else:
-        selection_group, selection_group_name = trajectory.getSelection_interactive("selection group")
-
-
     # 本程序分析同一组链中的全部链间接触；两组的输入顺序可以不同。
+    # 程序当前使用所有的链进行分析（目前单一组分或者多组分不做区分，全部加载进来）
+    reference_group, _ = trajectory.getSelection("group 0")
+    selection_group, _ = trajectory.getSelection("group 0")
+    
     reference_indices = np.sort(np.asarray(reference_group.indices, dtype=np.int64))
     selection_indices = np.sort(np.asarray(selection_group.indices, dtype=np.int64))
-    if reference_indices.size == 0:
-        raise ValueError("The reference group contains no atoms")
+    if reference_indices.size == 0 or selection_indices.size == 0 :
+        raise ValueError("The reference/selection group contains no atoms")
     if not np.array_equal(reference_indices, selection_indices):
         raise ValueError(
             "Cluster analysis requires reference and selection to contain the same atoms"
         )
 
+    # 所有链共同参与 cluster 分析；按真实拓扑分链，允许任意链长组合。
+    # 两组已验证为相同粒子集合，只需拆分一次，避免生成不同的局部链编号。
     reference_chains = trajectory.index.splitch_indices(reference_indices)
     chain_length_list_reference = [len(chain) for chain in reference_chains]
-    if len(set(chain_length_list_reference)) != 1:
-        print(f"ERROR: Chains in reference groups are not same in length.")
-        quit()
-
-    chain_length_reference = chain_length_list_reference[0]
-    print(f"## Processed {len(reference_chains)} chains of length {chain_length_reference} in reference group.")
+    chain_lengths = np.asarray(chain_length_list_reference, dtype=np.int64)
+    lengths, length_counts = np.unique(chain_lengths, return_counts=True)
+    length_summary = ", ".join(
+        f"{length} selected beads: {count} chains"
+        for length, count in zip(lengths, length_counts)
+    )
+    print(f"## Processed {len(reference_chains)} chains ({length_summary}).")
     print(f"## Reference and selection contain the same atoms; each contact is searched once.")
 
     # 从 contact.py 移植：搜索组局部编号 -> 全局 atom/bead 编号 -> 链/链内位置。
@@ -443,20 +424,13 @@ def cluster_distribution_fast(args):
         ts = trajectory.Universe.trajectory[frame_index]
         pos = np.asarray(search_atoms.positions, dtype=np.float32)
 
-        if args.treat_pbc:
-            box = ts.dimensions
-            if box is None:
-                raise ValueError("Periodic neighbor search requires trajectory box dimensions")
-        else:
-            # 非周期计算也需要 FastNS 的网格盒：平移坐标并构造包围盒。
-            # 各边额外留出空间，同时满足 FastNS 对最大 cutoff 的限制。
-            pos = pos - pos.min(axis=0)
-            box = np.empty(6, dtype=np.float32)
-            box[:3] = np.maximum(pos.max(axis=0) + 1.0, 2.0 * search_cutoff + 1.0)
-            box[3:] = 90.0
+        # 固定启用 PBC，使用当前帧的真实周期盒。
+        box = ts.dimensions
+        if box is None:
+            raise ValueError("Periodic neighbor search requires trajectory box dimensions")
 
         # 替换原来的全距离矩阵：只返回最大 cutoff 内的候选粒子对。
-        ns = FastNS(search_cutoff, pos, box=box, pbc=args.treat_pbc)
+        ns = FastNS(search_cutoff, pos, box=box, pbc=True)
         search_result = ns.self_search()
         pairs = search_result.get_pairs()
         pairs_atomid = search_atom_indices[pairs]
@@ -470,7 +444,8 @@ def cluster_distribution_fast(args):
         pairs_atomid = pairs_atomid[pair_distances < pair_cutoffs]
         del ns, search_result, pairs, pair_distances, pair_cutoffs
 
-        # 每个相邻链对复用一张残基图，求和后写入对称的链级矩阵。
+        # 每个相邻链对使用 Li x Lj 的矩形残基图，求和后写入对称链级矩阵。
+        # 不按链长分组搜索，不同长度链之间的接触也会进入同一张链级矩阵。
         # self_search 已返回不重复的无向粒子对，可跳过额外的粒子对去重。
         chain_contact_map_temp = accumulate_chain_contact_map_fixed(
             pairs_atomid, reference_chains, chain_lookup, unique_pairs=False,
@@ -496,9 +471,11 @@ def cluster_distribution_fast(args):
         del analyzer, chain_contact_map_temp
 
     output_path = Path(args.output_cluster_distribution)
+    # chain_lengths[k] 与 chain_ids[k] 对应同一条链，便于解释混合链长结果。
     np.savez(
         output_path, frame_indices=frame_list,
         cluster_distributions=cluster_size_distribution, chain_ids=chain_ids,
+        chain_lengths=chain_lengths,
     )
     max_clusters_array = np.empty(len(max_cluster), dtype=object)
     max_clusters_array[:] = max_cluster
@@ -507,6 +484,7 @@ def cluster_distribution_fast(args):
         frame_indices=frame_list,
         max_clusters=max_clusters_array,
         chain_ids=chain_ids,
+        chain_lengths=chain_lengths,
     )
     #print(chain_contact_map_max)
     np.savez(

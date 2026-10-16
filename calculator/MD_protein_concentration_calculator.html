@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>分子动力学 (MD) 多组分蛋白质浓度与序列分子量计算器</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #cbd5e1;
+      --border-light: #e2e8f0;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --success: #059669;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px 48px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    header h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    header p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 13px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: #f1f5f9;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #ffffff;
+      border-color: var(--success);
+    }
+
+    .btn-success:hover {
+      background: #047857;
+    }
+
+    .btn-danger {
+      color: var(--danger);
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .btn-danger:hover {
+      background: #fee2e2;
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 0.775rem;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border-light);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .kpi-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .kpi-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .kpi-sub {
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .grid-top {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--text);
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 0.875rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+    }
+
+    textarea {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      resize: vertical;
+      min-height: 70px;
+      line-height: 1.4;
+    }
+
+    .chain-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .chain-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .chain-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .chain-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .chain-body {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 860px) {
+      .chain-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .seq-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .ptm-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border: 1px solid var(--border-light);
+    }
+
+    @media (max-width: 600px) {
+      .ptm-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .chain-metrics {
+      background: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      align-content: start;
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-item span.label {
+      font-size: 0.73rem;
+      color: var(--muted);
+    }
+
+    .metric-item span.val {
+      font-size: 0.96rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    td.num, th.num {
+      text-align: right;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    tr.total-row {
+      background: #eff6ff;
+      font-weight: 700;
+    }
+
+    /* 采用上下通栏布局，避免宽表格挤压右侧曲线图导致 X 轴重叠 */
+    .bottom-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .formula-box {
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: #f8fafc;
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 10px;
+    }
+
+    .formula-box code {
+      font-family: var(--font-mono);
+      color: var(--text);
+      background: #e2e8f0;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .warn-text {
+      color: var(--danger);
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>分子动力学 (MD) 多组分蛋白质浓度与序列分子量计算器</h1>
+        <p>支持单链氨基酸序列实时分子量/净电荷解析、翻译后修饰 (PTM)、多组分异质模拟体系汇总、反推盒子尺寸与缓冲盐离子配比</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-success" onclick="recalculateAll()">立即重新计算</button>
+        <button type="button" class="btn" onclick="loadExamplePreset('asyn_wt')">示例1：216条 α-Syn (WT)</button>
+        <button type="button" class="btn" onclick="loadExamplePreset('asyn_mix')">示例2：WT + pS129 混合体系</button>
+        <button type="button" class="btn" onclick="exportCSV()">导出 CSV 表格</button>
+        <button type="button" class="btn btn-primary" onclick="copyMarkdownTable()">复制 Markdown 汇总表</button>
+      </div>
+    </header>
+
+    <!-- 顶部全局指标卡片 -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">总蛋白摩尔浓度 (C_total)</div>
+        <div class="kpi-value" id="kpi-molar-mM">--</div>
+        <div class="kpi-sub" id="kpi-molar-M">--</div>
+      </div>
+      <div class="kpi-card" style="border-left-color: #059669;">
+        <div class="kpi-label">总质量浓度 (ρ_total)</div>
+        <div class="kpi-value" id="kpi-mass-conc">--</div>
+        <div class="kpi-sub" id="kpi-vol-frac">--</div>
+      </div>
+      <div class="kpi-card" style="border-left-color: #7c3aed;">
+        <div class="kpi-label">模拟盒子体积 (V_box)</div>
+        <div class="kpi-value" id="kpi-box-vol">--</div>
+        <div class="kpi-sub" id="kpi-box-liters">--</div>
+      </div>
+      <div class="kpi-card" style="border-left-color: #d97706;">
+        <div class="kpi-label">总链数 / 总残基数 (Beads)</div>
+        <div class="kpi-value" id="kpi-total-chains">--</div>
+        <div class="kpi-sub" id="kpi-total-residues">--</div>
+      </div>
+    </div>
+
+    <!-- 盒子几何设置 & 反向计算/缓冲盐配比 -->
+    <div class="grid-top">
+      <div class="card">
+        <div class="card-title">
+          <span>1. 模拟盒子几何尺寸设置 (Box Geometry)</span>
+          <span class="badge">输入即刻联动计算</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="boxType">盒子类型</label>
+            <select id="boxType" onchange="onBoxTypeChange()">
+              <option value="cubic" selected>立方盒子 (Cubic: Lx = Ly = Lz)</option>
+              <option value="ortho">正交/长方体盒子 (Slab / Orthorhombic)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="lengthUnit">长度单位</label>
+            <select id="lengthUnit" onchange="onUnitChange()">
+              <option value="nm" selected>纳米 (nm)</option>
+              <option value="A">埃 (Å)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="boxLx" id="labelLx">盒子边长 L (nm)</label>
+            <input type="number" id="boxLx" value="59" min="0.1" step="0.5" oninput="recalculateAll()" onchange="recalculateAll()" />
+          </div>
+          <div class="form-group" id="groupLy" style="display:none;">
+            <label for="boxLy" id="labelLy">边长 Ly (nm)</label>
+            <input type="number" id="boxLy" value="59" min="0.1" step="0.5" oninput="recalculateAll()" onchange="recalculateAll()" />
+          </div>
+          <div class="form-group" id="groupLz" style="display:none;">
+            <label for="boxLz" id="labelLz">边长 Lz (nm)</label>
+            <input type="number" id="boxLz" value="120" min="0.1" step="0.5" oninput="recalculateAll()" onchange="recalculateAll()" />
+          </div>
+        </div>
+
+        <div class="formula-box">
+          <strong>由目标浓度反推盒子边长（固定当前总链数 <span id="revChainCount">216</span> 条）：</strong>
+          目标总浓度 <input type="number" id="targetConcInput" value="1.75" step="0.05" min="0.001" style="width:85px; display:inline-block; padding:3px 6px;" oninput="updateReverseCalc()" onchange="updateReverseCalc()" /> mM
+          &rarr; 所需立方盒子边长 <code>L = <span id="revBoxLength">58.96</span> nm</code>
+          <button type="button" class="btn btn-sm" style="margin-left:6px;" onclick="applyReverseBoxLength()">应用该边长</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>2. 缓冲盐与电中性反离子计算 (Salt & Counterions)</span>
+          <span class="badge">GROMACS genion 辅助</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="saltConc">目标盐浓度 (NaCl, mM)</label>
+            <input type="number" id="saltConc" value="150" min="0" step="5" oninput="recalculateAll()" onchange="recalculateAll()" />
+          </div>
+          <div class="form-group">
+            <label for="systemPh">体系 pH 值 (用于蛋白质净电荷计算)</label>
+            <input type="number" id="systemPh" value="7.4" min="1" max="14" step="0.1" oninput="recalculateAll()" onchange="recalculateAll()" />
+          </div>
+        </div>
+        <div class="formula-box" id="ionSummaryBox">
+          正在计算离子数量...
+        </div>
+      </div>
+    </div>
+
+    <!-- 多组分蛋白质链列表 -->
+    <div class="card" style="margin-bottom: 16px;">
+      <div class="card-title">
+        <span>3. 蛋白质/多肽组分设置 (支持多组分共模拟与氨基酸序列实时计算单链分子量)</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="addChainComponent()">+ 添加新蛋白质组分</button>
+      </div>
+      <div id="chainContainer" class="chain-list"></div>
+    </div>
+
+    <!-- 底部汇总表与浓度随尺寸变化曲线（上下全宽排列） -->
+    <div class="bottom-stack">
+      <div class="card">
+        <div class="card-title">
+          <span>4. 多组分模拟体系参数汇总表 (可直接用于论文 SI / 组会 PPT)</span>
+        </div>
+        <div class="table-wrapper">
+          <table id="summaryTable">
+            <thead>
+              <tr>
+                <th>组分名称</th>
+                <th class="num">链数 N</th>
+                <th class="num">单链残基数</th>
+                <th class="num">单链 Mw (kDa)</th>
+                <th class="num">单链净电荷</th>
+                <th class="num">摩尔浓度 (mM)</th>
+                <th class="num">摩尔浓度 (μM)</th>
+                <th class="num">质量浓度 (mg/mL)</th>
+                <th class="num">摩尔占比</th>
+                <th class="num">质量占比</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody"></tbody>
+          </table>
+        </div>
+        <div class="formula-box">
+          <strong>计算基准常数：</strong>阿伏伽德罗常数 <code>N_A = 6.02214076 × 10²³ mol⁻¹</code>；体积换算 <code>1 nm³ = 10⁻²⁴ L</code>；速算公式 <code>C (mM) = 1660.53907 × N / V(nm³)</code>。单链分子量由各氨基酸无水残基平均质量之和加上末端水分子 (<code>18.01528 Da</code>) 及翻译后修饰质量实时求和得出。
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>5. 体系总摩尔浓度随立方盒子边长 L 的衰减曲线 (C ∝ L⁻³)</span>
+          <span class="badge" id="chartBadge">N_total = 216</span>
+        </div>
+        <div id="chartContainer" style="width:100%; height:320px; position:relative;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">已复制到剪贴板</div>
+
+  <script>
+    // 标准 20 种氨基酸无水残基平均分子量 (Da)
+    const AA_MASS = {
+      A: 71.0788,  // Ala
+      R: 156.1875, // Arg
+      N: 114.1038, // Asn
+      D: 115.0886, // Asp
+      C: 103.1388, // Cys
+      E: 129.1155, // Glu
+      Q: 128.1307, // Gln
+      G: 57.0519,  // Gly
+      H: 137.1411, // His
+      I: 113.1594, // Ile
+      L: 113.1594, // Leu
+      K: 128.1741, // Lys
+      M: 131.1926, // Met
+      F: 147.1766, // Phe
+      P: 97.1167,  // Pro
+      S: 87.0782,  // Ser
+      T: 101.1051, // Thr
+      W: 186.2132, // Trp
+      Y: 163.1760, // Tyr
+      V: 99.1326   // Val
+    };
+
+    const WATER_MASS = 18.01528; // N端 -H 与 C端 -OH 之和 (Da)
+    const AVOGADRO_FACTOR = 1.6605390666; // 10^24 / N_A
+    const LINE_BREAK = String.fromCharCode(10);
+
+    // 常用蛋白/多肽序列预设库
+    const SEQUENCE_PRESETS = {
+      asyn_wt: {
+        name: "α-Synuclein (WT, 140 aa)",
+        seq: "MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYVGSKTKEGVVHGVATVAEKTKEQVTNVGGAVVTGVTAVAQKTVEGAGSIAAATGFVKKDQLGKNEEGAPQEGILEDMPVDPDNEAYEMPSEEGYQDYEPEA",
+        pS: 0, nAc: 0, cAm: 0, ss: 0
+      },
+      asyn_ps129: {
+        name: "α-Synuclein (pS129 磷酸化, 140 aa)",
+        seq: "MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYVGSKTKEGVVHGVATVAEKTKEQVTNVGGAVVTGVTAVAQKTVEGAGSIAAATGFVKKDQLGKNEEGAPQEGILEDMPVDPDNEAYEMPSEEGYQDYEPEA",
+        pS: 1, nAc: 0, cAm: 0, ss: 0
+      },
+      asyn_s129e: {
+        name: "α-Synuclein (S129E 突变, 140 aa)",
+        seq: "MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYVGSKTKEGVVHGVATVAEKTKEQVTNVGGAVVTGVTAVAQKTVEGAGSIAAATGFVKKDQLGKNEEGAPQEGILEDMPVDPDNEAYEMPEEEGYQDYEPEA",
+        pS: 0, nAc: 0, cAm: 0, ss: 0
+      },
+      asyn_py39: {
+        name: "α-Synuclein (pY39 磷酸化, 140 aa)",
+        seq: "MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYVGSKTKEGVVHGVATVAEKTKEQVTNVGGAVVTGVTAVAQKTVEGAGSIAAATGFVKKDQLGKNEEGAPQEGILEDMPVDPDNEAYEMPSEEGYQDYEPEA",
+        pS: 1, nAc: 0, cAm: 0, ss: 0
+      },
+      fus_lcd: {
+        name: "FUS-LCD (1-163 aa)",
+        seq: "MASNDYTQQATQSYGAYPTQPGQGYSQQSSQPYGQQSYSGYSQSTDTSGYGQSSYSSYGQSQNTGYGTQSTPQGYGSTGGYGSSQSSQSSYGQQSSYPGYGQQPAPSSTSGSYGSSSQSSSYGQPQSGSYSQQPSYGGQQQSYGQQQSYNPPQGYGQQNQYNS",
+        pS: 0, nAc: 0, cAm: 0, ss: 0
+      },
+      tdp43_lcd: {
+        name: "TDP-43 CTD (267-414 aa)",
+        seq: "NRQLERSGRFGGNPGGFGNQGGFGNSRGGGAGLGNNQGSNMGGGMNFGAFSINPAMMAAAQAALQSSWGMMGMLASQQNQSGPSGNNQNQGNMQREPNQAFGSGNNSYSGSNSGAAIGWGSASNAGSGSGFNGGFGSSMDSKSSGWGM",
+        pS: 0, nAc: 0, cAm: 0, ss: 0
+      },
+      ubiquitin: {
+        name: "Ubiquitin (泛素, 76 aa)",
+        seq: "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+        pS: 0, nAc: 0, cAm: 0, ss: 0
+      }
+    };
+
+    const COLORS = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2"];
+
+    let chains = [
+      {
+        id: 1,
+        name: "α-Synuclein (WT)",
+        count: 216,
+        mode: "seq",
+        sequence: SEQUENCE_PRESETS.asyn_wt.seq,
+        manualMwKda: 14.46,
+        pS: 0,
+        nAc: 0,
+        cAm: 0,
+        ss: 0
+      }
+    ];
+
+    let nextId = 2;
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // 根据 Henderson-Hasselbalch 公式估算单链在指定 pH 下的净电荷
+    function calcNetCharge(cleanSeq, pH, pSCount, nAcCount, cAmCount) {
+      if (!cleanSeq || cleanSeq.length === 0) return 0;
+      const counts = { D: 0, E: 0, C: 0, Y: 0, H: 0, K: 0, R: 0 };
+      for (let i = 0; i < cleanSeq.length; i++) {
+        const ch = cleanSeq[i];
+        if (counts[ch] !== undefined) counts[ch]++;
+      }
+      const posCharge =
+        (nAcCount > 0 ? 0 : 1 / (1 + Math.pow(10, pH - 8.6))) +
+        counts.K / (1 + Math.pow(10, pH - 10.8)) +
+        counts.R / (1 + Math.pow(10, pH - 12.5)) +
+        counts.H / (1 + Math.pow(10, pH - 6.5));
+
+      const negCharge =
+        (cAmCount > 0 ? 0 : 1 / (1 + Math.pow(10, 3.6 - pH))) +
+        counts.D / (1 + Math.pow(10, 3.9 - pH)) +
+        counts.E / (1 + Math.pow(10, 4.1 - pH)) +
+        counts.C / (1 + Math.pow(10, 8.5 - pH)) +
+        counts.Y / (1 + Math.pow(10, 10.1 - pH));
+
+      const phosCharge = pSCount * (1 / (1 + Math.pow(10, 1.2 - pH)) + 1 / (1 + Math.pow(10, 6.5 - pH)));
+      return posCharge - negCharge - phosCharge;
+    }
+
+    // 解析氨基酸序列并实时计算单链分子量
+    function analyzeSequence(rawSeq, pS, nAc, cAm, ss) {
+      const text = String(rawSeq || "");
+      const rawLines = text.split(LINE_BREAK);
+      const filteredLines = [];
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i].trim();
+        if (!line.startsWith(">") && !line.startsWith(";")) {
+          filteredLines.push(line);
+        }
+      }
+      const joined = filteredLines.join("").toUpperCase();
+
+      let validSeq = "";
+      const invalidChars = [];
+      let massDa = 0;
+
+      for (let i = 0; i < joined.length; i++) {
+        const ch = joined[i];
+        if (ch === " " || ch === "\t" || ch === "\r" || ch === "-" || ch === "*" || (ch >= "0" && ch <= "9")) {
+          continue;
+        }
+        if (AA_MASS[ch] !== undefined) {
+          validSeq += ch;
+          massDa += AA_MASS[ch];
+        } else if (invalidChars.indexOf(ch) === -1) {
+          invalidChars.push(ch);
+        }
+      }
+
+      if (validSeq.length > 0) {
+        massDa += WATER_MASS;
+        massDa += (Number(pS) || 0) * 79.9799;  // 磷酸化 +HPO3
+        massDa += (Number(nAc) || 0) * 42.0367; // 乙酰化 +CH3CO - H
+        massDa -= (Number(cAm) || 0) * 0.9848;  // C端酰胺化 -OH + NH2
+        massDa -= (Number(ss) || 0) * 2.0159;   // 二硫键 -2H
+      }
+
+      return {
+        cleanSeq: validSeq,
+        length: validSeq.length,
+        massDa: massDa,
+        massKda: massDa / 1000.0,
+        invalidChars: invalidChars
+      };
+    }
+
+    function renderChains() {
+      const container = document.getElementById("chainContainer");
+      if (!container) return;
+      container.innerHTML = "";
+
+      chains.forEach((chain, idx) => {
+        const color = COLORS[idx % COLORS.length];
+        const card = document.createElement("div");
+        card.className = "chain-card";
+        card.innerHTML = `
+          <div class="chain-header">
+            <div class="chain-title-group">
+              <span class="color-dot" style="background:${color}"></span>
+              <input type="text" value="${escapeHtml(chain.name)}" style="width:220px; font-weight:700;"
+                oninput="updateChainField(${chain.id}, 'name', this.value)" placeholder="输入组分名称" />
+              <select style="width:230px;" onchange="applyPresetToChain(${chain.id}, this.value)">
+                <option value="">-- 快速填入预设蛋白序列 --</option>
+                <option value="asyn_wt">α-Synuclein (WT, 140 aa)</option>
+                <option value="asyn_ps129">α-Synuclein (pS129 磷酸化)</option>
+                <option value="asyn_s129e">α-Synuclein (S129E 突变)</option>
+                <option value="asyn_py39">α-Synuclein (pY39 磷酸化)</option>
+                <option value="fus_lcd">FUS-LCD (1-163 aa)</option>
+                <option value="tdp43_lcd">TDP-43 CTD (267-414 aa)</option>
+                <option value="ubiquitin">Ubiquitin (泛素, 76 aa)</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <label style="font-size:0.8rem; font-weight:600; color:var(--muted);">蛋白链数 N_${idx + 1}:</label>
+              <input type="number" value="${chain.count}" min="0" step="1" style="width:95px; font-weight:700;"
+                oninput="updateChainField(${chain.id}, 'count', parseFloat(this.value) || 0)"
+                onchange="updateChainField(${chain.id}, 'count', parseFloat(this.value) || 0)" />
+              <button type="button" class="btn btn-sm" onclick="duplicateChain(${chain.id})">复制组分</button>
+              ${chains.length > 1 ? `<button type="button" class="btn btn-sm btn-danger" onclick="removeChain(${chain.id})">删除</button>` : ""}
+            </div>
+          </div>
+
+          <div class="chain-body">
+            <div>
+              <div class="seq-toolbar">
+                <label style="font-size:0.78rem; font-weight:600; color:var(--muted);">
+                  单链氨基酸序列 (粘贴单字母序列或 FASTA，实时计算单链 Mw)
+                </label>
+                <label style="font-size:0.76rem; cursor:pointer; color:var(--accent); font-weight:600;">
+                  <input type="checkbox" ${chain.mode === "manual" ? "checked" : ""}
+                    onchange="toggleChainMode(${chain.id}, this.checked)" />
+                  手动输入单链 Mw (kDa)
+                </label>
+              </div>
+
+              ${chain.mode === "seq" ? `
+                <textarea placeholder="粘贴单字母氨基酸序列，例如 MDVFMKGLS..."
+                  oninput="updateChainField(${chain.id}, 'sequence', this.value)"
+                  onchange="updateChainField(${chain.id}, 'sequence', this.value)">${escapeHtml(chain.sequence)}</textarea>
+                <div id="warn-${chain.id}" class="warn-text"></div>
+                <div class="ptm-row">
+                  <div class="form-group">
+                    <label title="每个磷酸化位点 +79.98 Da">磷酸化数 (pS/pT/pY)</label>
+                    <input type="number" min="0" step="1" value="${chain.pS}"
+                      oninput="updateChainField(${chain.id}, 'pS', parseInt(this.value, 10) || 0)"
+                      onchange="updateChainField(${chain.id}, 'pS', parseInt(this.value, 10) || 0)" />
+                  </div>
+                  <div class="form-group">
+                    <label title="每个乙酰化位点 +42.04 Da">乙酰化数 (N-Ac/K-Ac)</label>
+                    <input type="number" min="0" step="1" value="${chain.nAc}"
+                      oninput="updateChainField(${chain.id}, 'nAc', parseInt(this.value, 10) || 0)"
+                      onchange="updateChainField(${chain.id}, 'nAc', parseInt(this.value, 10) || 0)" />
+                  </div>
+                  <div class="form-group">
+                    <label title="C端酰胺化 -0.98 Da">C端酰胺化 (0或1)</label>
+                    <input type="number" min="0" max="1" step="1" value="${chain.cAm}"
+                      oninput="updateChainField(${chain.id}, 'cAm', parseInt(this.value, 10) || 0)"
+                      onchange="updateChainField(${chain.id}, 'cAm', parseInt(this.value, 10) || 0)" />
+                  </div>
+                  <div class="form-group">
+                    <label title="每个二硫键 -2.02 Da">二硫键数 (-S-S-)</label>
+                    <input type="number" min="0" step="1" value="${chain.ss}"
+                      oninput="updateChainField(${chain.id}, 'ss', parseInt(this.value, 10) || 0)"
+                      onchange="updateChainField(${chain.id}, 'ss', parseInt(this.value, 10) || 0)" />
+                  </div>
+                </div>
+              ` : `
+                <div class="form-row" style="margin-top:8px;">
+                  <div class="form-group">
+                    <label>手动指定单链分子量 Mw (kDa)</label>
+                    <input type="number" min="0.01" step="0.01" value="${chain.manualMwKda}"
+                      oninput="updateChainField(${chain.id}, 'manualMwKda', parseFloat(this.value) || 0)"
+                      onchange="updateChainField(${chain.id}, 'manualMwKda', parseFloat(this.value) || 0)" />
+                  </div>
+                </div>
+              `}
+            </div>
+
+            <div class="chain-metrics" id="metrics-${chain.id}"></div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      recalculateAll();
+    }
+
+    function updateChainField(id, field, value) {
+      const chain = chains.find(c => c.id === id);
+      if (!chain) return;
+      chain[field] = value;
+      recalculateAll();
+    }
+
+    function toggleChainMode(id, isManual) {
+      const chain = chains.find(c => c.id === id);
+      if (!chain) return;
+      if (isManual) {
+        const res = analyzeSequence(chain.sequence, chain.pS, chain.nAc, chain.cAm, chain.ss);
+        if (res.massKda > 0) chain.manualMwKda = parseFloat(res.massKda.toFixed(3));
+        chain.mode = "manual";
+      } else {
+        chain.mode = "seq";
+      }
+      renderChains();
+    }
+
+    function applyPresetToChain(id, presetKey) {
+      if (!presetKey || !SEQUENCE_PRESETS[presetKey]) return;
+      const preset = SEQUENCE_PRESETS[presetKey];
+      const chain = chains.find(c => c.id === id);
+      if (!chain) return;
+      chain.name = preset.name;
+      chain.sequence = preset.seq;
+      chain.pS = preset.pS;
+      chain.nAc = preset.nAc;
+      chain.cAm = preset.cAm;
+      chain.ss = preset.ss;
+      chain.mode = "seq";
+      renderChains();
+    }
+
+    function addChainComponent() {
+      chains.push({
+        id: nextId++,
+        name: "蛋白质组分 " + (chains.length + 1),
+        count: 50,
+        mode: "seq",
+        sequence: SEQUENCE_PRESETS.asyn_ps129.seq,
+        manualMwKda: 14.54,
+        pS: 1,
+        nAc: 0,
+        cAm: 0,
+        ss: 0
+      });
+      renderChains();
+    }
+
+    function duplicateChain(id) {
+      const orig = chains.find(c => c.id === id);
+      if (!orig) return;
+      chains.push({
+        id: nextId++,
+        name: orig.name + " (副本)",
+        count: orig.count,
+        mode: orig.mode,
+        sequence: orig.sequence,
+        manualMwKda: orig.manualMwKda,
+        pS: orig.pS,
+        nAc: orig.nAc,
+        cAm: orig.cAm,
+        ss: orig.ss
+      });
+      renderChains();
+    }
+
+    function removeChain(id) {
+      if (chains.length <= 1) return;
+      chains = chains.filter(c => c.id !== id);
+      renderChains();
+    }
+
+    function onBoxTypeChange() {
+      const type = document.getElementById("boxType").value;
+      const unit = document.getElementById("lengthUnit").value;
+      const isOrtho = type === "ortho";
+      document.getElementById("groupLy").style.display = isOrtho ? "flex" : "none";
+      document.getElementById("groupLz").style.display = isOrtho ? "flex" : "none";
+      document.getElementById("labelLx").textContent = isOrtho ? "边长 Lx (" + unit + ")" : "盒子边长 L (" + unit + ")";
+      document.getElementById("labelLy").textContent = "边长 Ly (" + unit + ")";
+      document.getElementById("labelLz").textContent = "边长 Lz (" + unit + ")";
+      recalculateAll();
+    }
+
+    function onUnitChange() {
+      const unit = document.getElementById("lengthUnit").value;
+      const lxInput = document.getElementById("boxLx");
+      const lyInput = document.getElementById("boxLy");
+      const lzInput = document.getElementById("boxLz");
+
+      if (unit === "A") {
+        lxInput.value = ((parseFloat(lxInput.value) || 0) * 10).toFixed(1);
+        lyInput.value = ((parseFloat(lyInput.value) || 0) * 10).toFixed(1);
+        lzInput.value = ((parseFloat(lzInput.value) || 0) * 10).toFixed(1);
+      } else {
+        lxInput.value = ((parseFloat(lxInput.value) || 0) / 10).toFixed(2);
+        lyInput.value = ((parseFloat(lyInput.value) || 0) / 10).toFixed(2);
+        lzInput.value = ((parseFloat(lzInput.value) || 0) / 10).toFixed(2);
+      }
+      onBoxTypeChange();
+    }
+
+    function getBoxVolumeNm3() {
+      const type = document.getElementById("boxType").value;
+      const unit = document.getElementById("lengthUnit").value;
+      const scale = unit === "A" ? 0.1 : 1.0;
+
+      const lx = Math.max(0.1, (parseFloat(document.getElementById("boxLx").value) || 0) * scale);
+      const ly = type === "ortho" ? Math.max(0.1, (parseFloat(document.getElementById("boxLy").value) || 0) * scale) : lx;
+      const lz = type === "ortho" ? Math.max(0.1, (parseFloat(document.getElementById("boxLz").value) || 0) * scale) : lx;
+
+      return { lx: lx, ly: ly, lz: lz, volNm3: lx * ly * lz };
+    }
+
+    function recalculateAll() {
+      const box = getBoxVolumeNm3();
+      const volNm3 = box.volNm3;
+      const volLiters = volNm3 * 1e-24;
+      const pH = parseFloat(document.getElementById("systemPh").value) || 7.4;
+      const saltConcMm = Math.max(0, parseFloat(document.getElementById("saltConc").value) || 0);
+
+      let totalChains = 0;
+      let totalResidues = 0;
+      let totalMolarM = 0;
+      let totalMassMgMl = 0;
+      let totalNetCharge = 0;
+
+      const computedRows = [];
+
+      chains.forEach((chain, idx) => {
+        const seqInfo = analyzeSequence(chain.sequence, chain.pS, chain.nAc, chain.cAm, chain.ss);
+        const mwKda = chain.mode === "seq" ? seqInfo.massKda : (parseFloat(chain.manualMwKda) || 0);
+        const mwDa = mwKda * 1000.0;
+        const resLen = chain.mode === "seq" ? seqInfo.length : 0;
+        const singleCharge = chain.mode === "seq"
+          ? calcNetCharge(seqInfo.cleanSeq, pH, chain.pS, chain.nAc, chain.cAm)
+          : 0;
+
+        const warnEl = document.getElementById("warn-" + chain.id);
+        if (warnEl) {
+          warnEl.textContent = seqInfo.invalidChars.length > 0
+            ? "已自动忽略非标准字符: " + seqInfo.invalidChars.join(", ")
+            : "";
+        }
+
+        const n = Math.max(0, parseFloat(chain.count) || 0);
+        const c_M = (AVOGADRO_FACTOR * n) / volNm3;
+        const c_mM = c_M * 1000.0;
+        const c_uM = c_M * 1e6;
+        const massMgMl = c_mM * mwKda;
+
+        totalChains += n;
+        totalResidues += n * resLen;
+        totalMolarM += c_M;
+        totalMassMgMl += massMgMl;
+        totalNetCharge += n * singleCharge;
+
+        computedRows.push({
+          chain: chain,
+          color: COLORS[idx % COLORS.length],
+          n: n,
+          resLen: resLen,
+          mwDa: mwDa,
+          mwKda: mwKda,
+          singleCharge: singleCharge,
+          c_M: c_M,
+          c_mM: c_mM,
+          c_uM: c_uM,
+          massMgMl: massMgMl
+        });
+
+        const metricsEl = document.getElementById("metrics-" + chain.id);
+        if (metricsEl) {
+          metricsEl.innerHTML = `
+            <div class="metric-item">
+              <span class="label">单链分子量 (Mw)</span>
+              <span class="val">${mwKda.toFixed(3)} kDa</span>
+              <span class="label">${mwDa.toFixed(1)} Da (${resLen > 0 ? resLen + " aa" : "手动模式"})</span>
+            </div>
+            <div class="metric-item">
+              <span class="label">该组分摩尔浓度</span>
+              <span class="val" style="color:var(--accent);">${c_mM.toFixed(4)} mM</span>
+              <span class="label">${c_M.toExponential(3)} M (${c_uM.toFixed(1)} μM)</span>
+            </div>
+            <div class="metric-item">
+              <span class="label">该组分质量浓度</span>
+              <span class="val">${massMgMl.toFixed(2)} mg/mL</span>
+              <span class="label">等于 ${massMgMl.toFixed(2)} g/L</span>
+            </div>
+            <div class="metric-item">
+              <span class="label">单链净电荷 (pH ${pH.toFixed(1)})</span>
+              <span class="val">${singleCharge >= 0 ? "+" : ""}${singleCharge.toFixed(1)} e</span>
+              <span class="label">组分总电荷: ${Math.round(n * singleCharge)} e</span>
+            </div>
+          `;
+        }
+      });
+
+      const totalMolarMm = totalMolarM * 1000.0;
+      const totalMolarUm = totalMolarM * 1e6;
+      const volFracPercent = totalMassMgMl * 0.073;
+
+      document.getElementById("kpi-molar-mM").textContent = totalMolarMm.toFixed(4) + " mM";
+      document.getElementById("kpi-molar-M").textContent = totalMolarM.toExponential(4) + " M (" + totalMolarUm.toFixed(1) + " μM)";
+      document.getElementById("kpi-mass-conc").textContent = totalMassMgMl.toFixed(2) + " mg/mL";
+      document.getElementById("kpi-vol-frac").textContent = "蛋白质排阻体积分数 φ ≈ " + volFracPercent.toFixed(2) + "%";
+      document.getElementById("kpi-box-vol").textContent = Math.round(volNm3).toLocaleString() + " nm³";
+      document.getElementById("kpi-box-liters").textContent = volLiters.toExponential(4) + " L";
+      document.getElementById("kpi-total-chains").textContent = totalChains + " 条链 (" + chains.length + " 种组分)";
+      document.getElementById("kpi-total-residues").textContent = "共 " + totalResidues.toLocaleString() + " 个氨基酸残基";
+
+      document.getElementById("revChainCount").textContent = totalChains;
+      updateReverseCalc();
+
+      const roundedNetCharge = Math.round(totalNetCharge);
+      const saltPairs = Math.round((saltConcMm * 1e-3 * volNm3) / AVOGADRO_FACTOR);
+      const neutralNa = roundedNetCharge < 0 ? Math.abs(roundedNetCharge) : 0;
+      const neutralCl = roundedNetCharge > 0 ? Math.abs(roundedNetCharge) : 0;
+      const totalNa = saltPairs + neutralNa;
+      const totalCl = saltPairs + neutralCl;
+
+      document.getElementById("ionSummaryBox").innerHTML = `
+        蛋白质总净电荷 (pH ${pH.toFixed(1)})：<code>${roundedNetCharge >= 0 ? "+" : ""}${roundedNetCharge} e</code>
+        | 电中性反离子：<code>${neutralNa > 0 ? neutralNa + " Na⁺" : (neutralCl > 0 ? neutralCl + " Cl⁻" : "0")}</code><br/>
+        ${saltConcMm} mM NaCl 附加盐离子对：<code>${saltPairs.toLocaleString()} Na⁺ + ${saltPairs.toLocaleString()} Cl⁻</code><br/>
+        <strong>推荐添加总离子数：</strong><code>${totalNa.toLocaleString()} 个 Na⁺</code> 与 <code>${totalCl.toLocaleString()} 个 Cl⁻</code>
+      `;
+
+      const tbody = document.getElementById("summaryTableBody");
+      tbody.innerHTML = "";
+      computedRows.forEach(r => {
+        const molePct = totalChains > 0 ? ((r.n / totalChains) * 100).toFixed(1) + "%" : "0.0%";
+        const massPct = totalMassMgMl > 0 ? ((r.massMgMl / totalMassMgMl) * 100).toFixed(1) + "%" : "0.0%";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><span class="color-dot" style="background:${r.color}; margin-right:6px;"></span>${escapeHtml(r.chain.name)}</td>
+          <td class="num">${r.n}</td>
+          <td class="num">${r.resLen || "-"}</td>
+          <td class="num">${r.mwKda.toFixed(3)}</td>
+          <td class="num">${r.singleCharge >= 0 ? "+" : ""}${r.singleCharge.toFixed(1)}</td>
+          <td class="num">${r.c_mM.toFixed(4)}</td>
+          <td class="num">${r.c_uM.toFixed(1)}</td>
+          <td class="num">${r.massMgMl.toFixed(2)}</td>
+          <td class="num">${molePct}</td>
+          <td class="num">${massPct}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalTr = document.createElement("tr");
+      totalTr.className = "total-row";
+      totalTr.innerHTML = `
+        <td>体系总计 (Total System)</td>
+        <td class="num">${totalChains}</td>
+        <td class="num">${totalResidues}</td>
+        <td class="num">-</td>
+        <td class="num">${roundedNetCharge >= 0 ? "+" : ""}${roundedNetCharge} e</td>
+        <td class="num">${totalMolarMm.toFixed(4)}</td>
+        <td class="num">${totalMolarUm.toFixed(1)}</td>
+        <td class="num">${totalMassMgMl.toFixed(2)}</td>
+        <td class="num">100.0%</td>
+        <td class="num">100.0%</td>
+      `;
+      tbody.appendChild(totalTr);
+
+      document.getElementById("chartBadge").textContent = "N_total = " + totalChains + " 条链";
+      drawScalingChart(totalChains, Math.cbrt(volNm3), totalMolarMm);
+    }
+
+    function updateReverseCalc() {
+      const targetMm = Math.max(0.0001, parseFloat(document.getElementById("targetConcInput").value) || 1.75);
+      const totalChains = chains.reduce((acc, c) => acc + (parseFloat(c.count) || 0), 0);
+      const reqVolNm3 = (AVOGADRO_FACTOR * 1000.0 * totalChains) / targetMm;
+      const reqL = Math.cbrt(reqVolNm3);
+      document.getElementById("revBoxLength").textContent = reqL.toFixed(2);
+    }
+
+    function applyReverseBoxLength() {
+      const reqL = parseFloat(document.getElementById("revBoxLength").textContent) || 59;
+      document.getElementById("boxType").value = "cubic";
+      const unit = document.getElementById("lengthUnit").value;
+      document.getElementById("boxLx").value = unit === "A" ? (reqL * 10).toFixed(1) : reqL.toFixed(2);
+      onBoxTypeChange();
+    }
+
+    // 自适应宽度与防重叠刻度的 SVG 衰减曲线绘制函数
+    function drawScalingChart(totalChains, currentLNm, currentConcMm) {
+      const container = document.getElementById("chartContainer");
+      if (!container) return;
+      const width = Math.max(320, container.clientWidth || 800);
+      const height = 310;
+      const pad = { top: 24, right: 32, bottom: 48, left: 68 };
+      const plotW = Math.max(120, width - pad.left - pad.right);
+      const plotH = height - pad.top - pad.bottom;
+
+      const minL = Math.max(10, Math.floor(currentLNm * 0.55));
+      const maxL = Math.max(minL + 25, Math.ceil(currentLNm * 1.65));
+
+      const points = [];
+      const steps = 80;
+      for (let i = 0; i <= steps; i++) {
+        const L = minL + (i / steps) * (maxL - minL);
+        const cMm = (AVOGADRO_FACTOR * 1000.0 * totalChains) / Math.pow(L, 3);
+        points.push({ L: L, cMm: cMm });
+      }
+
+      const maxC = Math.max(points[0].cMm, currentConcMm * 1.2, 0.1);
+      const xScale = L => pad.left + ((L - minL) / (maxL - minL)) * plotW;
+      const yScale = C => pad.top + plotH - Math.min(1, C / maxC) * plotH;
+
+      const pathData = points
+        .map((p, i) => (i === 0 ? "M" : "L") + xScale(p.L).toFixed(1) + "," + yScale(p.cMm).toFixed(1))
+        .join(" ");
+
+      const curX = xScale(currentLNm);
+      const curY = yScale(currentConcMm);
+
+      let gridHtml = "";
+      const yTicks = 4;
+      for (let i = 0; i <= yTicks; i++) {
+        const yVal = (maxC * i) / yTicks;
+        const yPos = yScale(yVal);
+        gridHtml += `<line x1="${pad.left}" y1="${yPos}" x2="${width - pad.right}" y2="${yPos}" stroke="#e2e8f0" stroke-dasharray="3,3" />`;
+        gridHtml += `<text x="${pad.left - 10}" y="${yPos + 4}" text-anchor="end" font-size="11.5" fill="#64748b">${yVal.toFixed(2)}</text>`;
+      }
+
+      // 根据画布实际像素宽度动态决定 X 轴刻度数量，彻底避免文字重叠
+      const xTickCount = Math.max(4, Math.min(10, Math.floor(plotW / 80)));
+      for (let i = 0; i <= xTickCount; i++) {
+        const xVal = minL + ((maxL - minL) * i) / xTickCount;
+        const xPos = xScale(xVal);
+        gridHtml += `<line x1="${xPos}" y1="${pad.top}" x2="${xPos}" y2="${pad.top + plotH}" stroke="#f1f5f9" />`;
+        gridHtml += `<line x1="${xPos}" y1="${pad.top + plotH}" x2="${xPos}" y2="${pad.top + plotH + 5}" stroke="#94a3b8" />`;
+        gridHtml += `<text x="${xPos}" y="${pad.top + plotH + 20}" text-anchor="middle" font-size="11.5" fill="#475569">${xVal.toFixed(0)}</text>`;
+      }
+
+      // 智能计算红色当前状态点的标签框位置（带白色半透明背景防遮挡）
+      const labelText = `(${currentLNm.toFixed(1)} nm, ${currentConcMm.toFixed(3)} mM)`;
+      const boxW = 162;
+      const boxH = 24;
+      const placeOnLeft = (curX + 12 + boxW) > (width - pad.right);
+      const boxX = placeOnLeft ? (curX - 12 - boxW) : (curX + 12);
+      const boxY = Math.max(pad.top + 4, curY - 30);
+      const textX = boxX + boxW / 2;
+      const textY = boxY + 16;
+
+      container.innerHTML = `
+        <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}">
+          ${gridHtml}
+          <!-- 坐标轴主线 -->
+          <line x1="${pad.left}" y1="${pad.top + plotH}" x2="${width - pad.right}" y2="${pad.top + plotH}" stroke="#64748b" stroke-width="1.2" />
+          <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" stroke="#64748b" stroke-width="1.2" />
+
+          <!-- C ∝ L^-3 曲线 -->
+          <path d="${pathData}" fill="none" stroke="#2563eb" stroke-width="2.6" />
+
+          <!-- 当前工作点虚线与圆点 -->
+          <line x1="${curX}" y1="${pad.top + plotH}" x2="${curX}" y2="${curY}" stroke="#dc2626" stroke-dasharray="4,3" stroke-width="1.3" />
+          <line x1="${pad.left}" y1="${curY}" x2="${curX}" y2="${curY}" stroke="#dc2626" stroke-dasharray="4,3" stroke-width="1.3" />
+          <circle cx="${curX}" cy="${curY}" r="5.5" fill="#dc2626" stroke="#ffffff" stroke-width="2" />
+
+          <!-- 当前工作点数值标签 (带浅白底框防止与网格或曲线重叠) -->
+          <rect x="${boxX}" y="${boxY}" width="${boxW}" height="${boxH}" rx="5" fill="rgba(255, 255, 255, 0.92)" stroke="#fecaca" stroke-width="1" />
+          <text x="${textX}" y="${textY}" text-anchor="middle" font-size="12" font-weight="700" fill="#dc2626">${labelText}</text>
+
+          <!-- X 轴与 Y 轴标题 -->
+          <text x="${pad.left + plotW / 2}" y="${height - 6}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#334155">
+            等效立方盒子边长 L (nm)
+          </text>
+          <text x="16" y="${pad.top + plotH / 2}" text-anchor="middle" font-size="12.5" font-weight="600" fill="#334155" transform="rotate(-90, 16, ${pad.top + plotH / 2})">
+            体系总摩尔浓度 C (mM)
+          </text>
+        </svg>
+      `;
+    }
+
+    function loadExamplePreset(type) {
+      document.getElementById("boxType").value = "cubic";
+      document.getElementById("lengthUnit").value = "nm";
+      document.getElementById("boxLx").value = "59";
+      if (type === "asyn_wt") {
+        chains = [
+          {
+            id: nextId++,
+            name: "α-Synuclein (WT)",
+            count: 216,
+            mode: "seq",
+            sequence: SEQUENCE_PRESETS.asyn_wt.seq,
+            manualMwKda: 14.46,
+            pS: 0, nAc: 0, cAm: 0, ss: 0
+          }
+        ];
+      } else if (type === "asyn_mix") {
+        chains = [
+          {
+            id: nextId++,
+            name: "α-Synuclein (WT)",
+            count: 108,
+            mode: "seq",
+            sequence: SEQUENCE_PRESETS.asyn_wt.seq,
+            manualMwKda: 14.46,
+            pS: 0, nAc: 0, cAm: 0, ss: 0
+          },
+          {
+            id: nextId++,
+            name: "α-Synuclein (pS129)",
+            count: 108,
+            mode: "seq",
+            sequence: SEQUENCE_PRESETS.asyn_ps129.seq,
+            manualMwKda: 14.54,
+            pS: 1, nAc: 0, cAm: 0, ss: 0
+          }
+        ];
+      }
+      onBoxTypeChange();
+      renderChains();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2200);
+    }
+
+    function exportCSV() {
+      const rows = [["Component", "Chains_N", "Residues_aa", "Mw_kDa", "NetCharge_e", "Conc_mM", "Conc_uM", "MassConc_mg_mL", "MoleFraction", "MassFraction"]];
+      const trs = document.querySelectorAll("#summaryTableBody tr");
+      trs.forEach(tr => {
+        const cols = Array.from(tr.querySelectorAll("td")).map(td => td.innerText.trim());
+        rows.push(cols);
+      });
+      const csvContent = "\uFEFF" + rows.map(r => r.map(c => '"' + c.replace(/"/g, '""') + '"').join(",")).join(LINE_BREAK);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "MD_Simulation_Concentration_Summary.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function copyMarkdownTable() {
+      const lines = [
+        "| 组分名称 | 链数 N | 单链残基数 | 单链 Mw (kDa) | 单链净电荷 | 摩尔浓度 (mM) | 摩尔浓度 (μM) | 质量浓度 (mg/mL) | 摩尔占比 | 质量占比 |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+      ];
+      const trs = document.querySelectorAll("#summaryTableBody tr");
+      trs.forEach(tr => {
+        const cols = Array.from(tr.querySelectorAll("td")).map(td => td.innerText.trim());
+        lines.push("| " + cols.join(" | ") + " |");
+      });
+      const md = lines.join(LINE_BREAK);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(md).then(() => {
+          showToast("已将 Markdown 汇总表复制到剪贴板！");
+        });
+      } else {
+        showToast("当前浏览器环境不支持自动复制，请直接导出 CSV");
+      }
+    }
+
+    window.addEventListener("resize", () => recalculateAll());
+    renderChains();
+  </script>
+</body>
+</html>
